@@ -1,0 +1,7 @@
+{
+  "name": "Roadtrip Master CZ",
+  "description": "Chytrý plánovač roadtripů s podporou umělé inteligence pro ubytování, památky, turistiku a restaurace.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
