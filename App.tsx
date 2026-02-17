@@ -13,173 +13,139 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | undefined>();
 
-  // Načtení historie a zpracování sdíleného odkazu při startu
   useEffect(() => {
-    const savedHistory = localStorage.getItem('trip_history');
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
-    }
+    // 1. Načtení historie
+    const saved = localStorage.getItem('rt_history');
+    if (saved) setHistory(JSON.parse(saved));
 
-    // Zpracování sdíleného odkazu z URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedData = urlParams.get('share');
-    if (sharedData) {
+    // 2. Zpracování sdíleného odkazu (např. z mobilu)
+    const params = new URLSearchParams(window.location.search);
+    const shared = params.get('plan');
+    if (shared) {
       try {
-        const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
-        setPlan({
-          content: decoded.content,
-          groundingLinks: decoded.links || [],
-          id: 'shared-' + Date.now(),
-          createdAt: Date.now()
-        });
-        // Odstranění parametru z URL bez reloadu
-        window.history.replaceState({}, document.title, window.location.pathname);
+        const decoded = JSON.parse(decodeURIComponent(atob(shared)));
+        setPlan(decoded);
+        window.history.replaceState({}, '', window.location.pathname);
       } catch (e) {
-        console.error("Chyba při dekódování sdíleného plánu", e);
+        console.error("Chyba při načítání sdíleného plánu");
       }
     }
 
-    // Geolocation
+    // 3. Lokalita pro lepší Mapy grounding
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => console.log('Geolocation denied')
+        (p) => setUserLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+        () => console.log("Lokalita nepovolena")
       );
     }
   }, []);
 
-  const handlePlanSubmit = async (data: TripPlanRequest) => {
+  const handleSubmit = async (data: TripPlanRequest) => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await generateTripPlan(data, userLocation);
       setPlan(result);
       
-      // Uložení do historie
-      const newHistory = [result, ...history].slice(0, 10); // Posledních 10 cest
+      const newHistory = [result, ...history].slice(0, 15);
       setHistory(newHistory);
-      localStorage.setItem('trip_history', JSON.stringify(newHistory));
-
-      setTimeout(() => {
-        document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      localStorage.setItem('rt_history', JSON.stringify(newHistory));
+      
+      document.getElementById('itinerary-view')?.scrollIntoView({ behavior: 'smooth' });
     } catch (err: any) {
-      setError(err.message || 'Chyba při generování.');
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteFromHistory = (id: string) => {
-    const newHistory = history.filter(item => item.id !== id);
-    setHistory(newHistory);
-    localStorage.setItem('trip_history', JSON.stringify(newHistory));
+  const clearHistory = () => {
+    if (confirm("Opravdu chcete smazat celou historii cest?")) {
+      setHistory([]);
+      localStorage.removeItem('rt_history');
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Header />
       
-      <main className="flex-grow">
-        <div className="relative bg-slate-900 py-16 sm:py-24">
-          <img
-            src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=2070&auto=format&fit=crop"
-            alt="Roadtrip background"
-            className="absolute inset-0 w-full h-full object-cover opacity-40"
-          />
-          <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4">Plánovač Roadtripů</h1>
-            <p className="text-slate-300 text-lg max-w-2xl">Váš osobní asistent pro cesty vozem Hyundai i30. Naplánujte, uložte a sdílejte své zážitky.</p>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Levý panel: Nastavení a Historie */}
+          <div className="lg:col-span-4 space-y-6">
+            <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
             
-            {/* Levý sloupec: Formulář a Historie */}
-            <div className="lg:col-span-5 space-y-8">
-              <TripForm onSubmit={handlePlanSubmit} isLoading={isLoading} />
-              
-              {history.length > 0 && (
-                <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-6">
-                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    🕒 Moje uložené cesty
+            {history.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    📂 Moje garáž
                   </h3>
-                  <div className="space-y-3">
-                    {history.map((item) => (
-                      <div key={item.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
-                        <button 
-                          onClick={() => {
-                            setPlan(item);
-                            document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          className="flex-grow text-left"
-                        >
-                          <p className="font-semibold text-slate-700 truncate">
-                            {item.request?.destination || 'Sdílená cesta'}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {new Date(item.createdAt || 0).toLocaleDateString('cs-CZ')} • {item.request?.days || '?'} dní
-                          </p>
-                        </button>
-                        <button 
-                          onClick={() => deleteFromHistory(item.id!)}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                  <button onClick={clearHistory} className="text-xs text-red-500 hover:underline">Smazat vše</button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto divide-y divide-slate-100">
+                  {history.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setPlan(item)}
+                      className={`w-full text-left p-4 hover:bg-indigo-50 transition-colors group ${plan?.id === item.id ? 'bg-indigo-50 border-l-4 border-indigo-600' : ''}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-semibold text-slate-800 truncate block pr-2">
+                          {item.request?.destination || "Sdílená cesta"}
+                        </span>
+                        <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500">
+                          {item.request?.days} dny
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-xs text-slate-400 mt-1 block italic">
+                        {new Date(item.createdAt || 0).toLocaleDateString()}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* Pravý sloupec: Výsledky */}
-            <div id="results" className="lg:col-span-7 min-h-[500px]">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-3xl mb-6 flex gap-4 items-center">
-                  <div className="bg-red-100 p-2 rounded-full">⚠️</div>
-                  <div>
-                    <p className="font-bold">Něco se nepovedlo</p>
-                    <p className="text-sm opacity-90">{error}</p>
-                  </div>
-                </div>
-              )}
+          {/* Pravý panel: Výsledek */}
+          <div className="lg:col-span-8">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
+                <h4 className="text-red-800 font-bold mb-1">Chyba při komunikaci</h4>
+                <p className="text-red-600 text-sm leading-relaxed">{error}</p>
+                <p className="text-xs text-red-400 mt-4 italic">
+                  Tip: Pokud jste na Vercelu, ujistěte se, že jste po přidání API_KEY v Settings provedli nový "Redeploy".
+                </p>
+              </div>
+            )}
 
-              {plan ? (
+            {isLoading ? (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-20 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+                <h3 className="text-xl font-bold text-slate-800">Startujeme Hyundai i30...</h3>
+                <p className="text-slate-500 mt-2">AI právě mapuje hrady, zámky a nejlepší trasy.</p>
+              </div>
+            ) : plan ? (
+              <div id="itinerary-view">
                 <Itinerary plan={plan} />
-              ) : !isLoading && (
-                <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-white/50 backdrop-blur-sm">
-                  <div className="text-6xl mb-4">🚗</div>
-                  <h3 className="text-xl font-bold text-slate-700">Kam vyrazíme?</h3>
-                  <p className="text-slate-500 max-w-xs mt-2 text-sm">
-                    Vyplňte cíl cesty a AI připraví itinerář, který si můžete uložit i do mobilu.
-                  </p>
-                </div>
-              )}
-
-              {isLoading && (
-                <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                  <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-slate-700">Generujeme vaši cestu...</p>
-                    <p className="text-sm text-slate-400">Hledáme nejlepší hrady, restaurace a trasy pro vaši i30.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="bg-white/50 border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center flex flex-col items-center justify-center">
+                <div className="text-6xl mb-4 opacity-20">🗺️</div>
+                <h3 className="text-xl font-bold text-slate-400 italic">Zatím žádný plán k zobrazení</h3>
+                <p className="text-slate-400 max-w-xs mt-2 text-sm">Zadejte detaily vlevo a naplánujeme vaši příští jízdu.</p>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-slate-400 text-xs sm:text-sm">
-            Roadtrip Master CZ • Hyundai i30 Fastback Edition • Data jsou ukládána lokálně ve vašem prohlížeči.
-          </p>
+      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 text-center text-slate-400 text-xs">
+          Roadtrip Master CZ • Hyundai i30 Edition • Data uložena lokálně • AI Gemini 3 Flash
         </div>
       </footer>
     </div>
