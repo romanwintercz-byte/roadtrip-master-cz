@@ -8,20 +8,42 @@ import { generateTripPlan } from './services/gemini';
 
 const App: React.FC = () => {
   const [plan, setPlan] = useState<TripPlanResponse | null>(null);
+  const [history, setHistory] = useState<TripPlanResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | undefined>();
 
+  // Načtení historie a zpracování sdíleného odkazu při startu
   useEffect(() => {
+    const savedHistory = localStorage.getItem('trip_history');
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory));
+    }
+
+    // Zpracování sdíleného odkazu z URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedData = urlParams.get('share');
+    if (sharedData) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
+        setPlan({
+          content: decoded.content,
+          groundingLinks: decoded.links || [],
+          id: 'shared-' + Date.now(),
+          createdAt: Date.now()
+        });
+        // Odstranění parametru z URL bez reloadu
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (e) {
+        console.error("Chyba při dekódování sdíleného plánu", e);
+      }
+    }
+
+    // Geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-        },
-        () => console.log('Geolocation permission denied')
+        (pos) => setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => console.log('Geolocation denied')
       );
     }
   }, []);
@@ -32,15 +54,26 @@ const App: React.FC = () => {
     try {
       const result = await generateTripPlan(data, userLocation);
       setPlan(result);
+      
+      // Uložení do historie
+      const newHistory = [result, ...history].slice(0, 10); // Posledních 10 cest
+      setHistory(newHistory);
+      localStorage.setItem('trip_history', JSON.stringify(newHistory));
+
       setTimeout(() => {
         document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     } catch (err: any) {
-      setError(err.message || 'Nepodařilo se vygenerovat plán. Zkontrolujte připojení a API klíč.');
-      console.error(err);
+      setError(err.message || 'Chyba při generování.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const deleteFromHistory = (id: string) => {
+    const newHistory = history.filter(item => item.id !== id);
+    setHistory(newHistory);
+    localStorage.setItem('trip_history', JSON.stringify(newHistory));
   };
 
   return (
@@ -48,57 +81,93 @@ const App: React.FC = () => {
       <Header />
       
       <main className="flex-grow">
-        <div className="relative overflow-hidden bg-slate-900 py-20 sm:py-28">
+        <div className="relative bg-slate-900 py-16 sm:py-24">
           <img
-            src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop"
-            alt="Roadtrip"
-            className="absolute inset-0 -z-10 h-full w-full object-cover opacity-50"
+            src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=2070&auto=format&fit=crop"
+            alt="Roadtrip background"
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
           />
-          <div className="mx-auto max-w-7xl px-6 lg:px-8 text-center sm:text-left">
-            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl mb-6">
-              Váš roadtrip, <br className="hidden sm:block" /> sestavený inteligencí.
-            </h1>
-            <p className="max-w-xl text-lg leading-8 text-slate-300">
-              Personalizované plány cest optimalizované pro váš Hyundai i30. 
-              Stačí říct kam a na jak dlouho.
-            </p>
+          <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4">Plánovač Roadtripů</h1>
+            <p className="text-slate-300 text-lg max-w-2xl">Váš osobní asistent pro cesty vozem Hyundai i30. Naplánujte, uložte a sdílejte své zážitky.</p>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            <div className="lg:col-span-5 sticky top-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Levý sloupec: Formulář a Historie */}
+            <div className="lg:col-span-5 space-y-8">
               <TripForm onSubmit={handlePlanSubmit} isLoading={isLoading} />
               
-              {error && (
-                <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl shadow-sm animate-in fade-in duration-300">
-                  <div className="flex gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <p className="font-bold mb-1">Chyba při generování</p>
-                      <p className="text-sm opacity-90">{error}</p>
-                    </div>
+              {history.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-6">
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    🕒 Moje uložené cesty
+                  </h3>
+                  <div className="space-y-3">
+                    {history.map((item) => (
+                      <div key={item.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
+                        <button 
+                          onClick={() => {
+                            setPlan(item);
+                            document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          className="flex-grow text-left"
+                        >
+                          <p className="font-semibold text-slate-700 truncate">
+                            {item.request?.destination || 'Sdílená cesta'}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {new Date(item.createdAt || 0).toLocaleDateString('cs-CZ')} • {item.request?.days || '?'} dní
+                          </p>
+                        </button>
+                        <button 
+                          onClick={() => deleteFromHistory(item.id!)}
+                          className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
 
-            <div id="results" className="lg:col-span-7">
+            {/* Pravý sloupec: Výsledky */}
+            <div id="results" className="lg:col-span-7 min-h-[500px]">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-3xl mb-6 flex gap-4 items-center">
+                  <div className="bg-red-100 p-2 rounded-full">⚠️</div>
+                  <div>
+                    <p className="font-bold">Něco se nepovedlo</p>
+                    <p className="text-sm opacity-90">{error}</p>
+                  </div>
+                </div>
+              )}
+
               {plan ? (
                 <Itinerary plan={plan} />
-              ) : (
-                <div className="h-full min-h-[400px] flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-white/50 backdrop-blur-sm">
-                  <div className="bg-indigo-50 p-6 rounded-full mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-700 mb-2">Připraveni na cestu?</h3>
-                  <p className="text-slate-500 max-w-sm">
-                    Vyplňte parametry vlevo. AI analyzuje trasu, spotřebu vašeho vozu a vyhledá nejlepší místa k návštěvě.
+              ) : !isLoading && (
+                <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-white/50 backdrop-blur-sm">
+                  <div className="text-6xl mb-4">🚗</div>
+                  <h3 className="text-xl font-bold text-slate-700">Kam vyrazíme?</h3>
+                  <p className="text-slate-500 max-w-xs mt-2 text-sm">
+                    Vyplňte cíl cesty a AI připraví itinerář, který si můžete uložit i do mobilu.
                   </p>
+                </div>
+              )}
+
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                  <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-slate-700">Generujeme vaši cestu...</p>
+                    <p className="text-sm text-slate-400">Hledáme nejlepší hrady, restaurace a trasy pro vaši i30.</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -106,10 +175,10 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-10 mt-auto">
+      <footer className="bg-white border-t border-slate-200 py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-slate-400 text-sm font-medium">
-            Roadtrip Master CZ • Hyundai i30 Edition
+          <p className="text-slate-400 text-xs sm:text-sm">
+            Roadtrip Master CZ • Hyundai i30 Fastback Edition • Data jsou ukládána lokálně ve vašem prohlížeči.
           </p>
         </div>
       </footer>

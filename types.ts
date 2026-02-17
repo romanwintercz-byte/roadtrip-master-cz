@@ -21,6 +21,9 @@ export interface GroundingChunk {
 export interface TripPlanResponse {
   content: string;
   groundingLinks: GroundingChunk[];
+  id?: string;
+  createdAt?: number;
+  request?: TripPlanRequest;
 }
 
 export enum TravelStyle {
