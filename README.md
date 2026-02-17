@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# 🚗 Roadtrip Master CZ
 
-This contains everything you need to run your app locally.
+Chytrý plánovač roadtripů s podporou AI (Google Gemini). Aplikace navrhuje itineráře na míru, doporučuje památky, restaurace a ubytování.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1WFc77T0PLPRf79dJ-7dFvHf5i-v-mT8B
+## ✨ Funkce
+- **AI Plánování:** Generování itineráře na základě cíle, počtu dní a stylu cesty.
+- **Logistika pro Hyundai i30:** Specifický výpočet spotřeby a času na cestě pro model i30 Fastback 1.5 T-GDi MHEV.
+- **Google Grounding:** Odkazy na reálné weby a Google Mapy přímo v itineráři.
+- **Geolokace:** Možnost plánovat cesty z vaší aktuální polohy.
 
-## Run Locally
+## 🛠️ Technologie
+- React 19
+- Google Gemini API (@google/genai)
+- Tailwind CSS
+- TypeScript
 
-**Prerequisites:**  Node.js
+## 🚀 Jak spustit
+1. Naklonujte repozitář.
+2. Nastavte environmentální proměnnou `API_KEY` s vaším klíčem z Google AI Studio.
+3. Spusťte pomocí libovolného lokálního serveru (např. Vite nebo Live Server).
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 📝 Poznámka k nasazení
+Aplikace využívá `process.env.API_KEY`. Pro správné fungování na GitHub Pages je nutné klíč bezpečně injektovat nebo využít proxy server, aby nedošlo k jeho úniku do klientského kódu.

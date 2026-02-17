@@ -6,7 +6,13 @@ export const generateTripPlan = async (
   request: TripPlanRequest,
   userLocation?: { latitude: number; longitude: number }
 ): Promise<TripPlanResponse> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API_KEY není definován v prostředí (process.env.API_KEY). Ujistěte se, že jste jej nastavili v ovládacím panelu Vercel.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const prompt = `Navrhni detailní roadtripový itinerář pro lokalitu: ${request.destination}.
     Délka: ${request.days} dní.
@@ -25,12 +31,11 @@ export const generateTripPlan = async (
     Sloupce: Den, Trasa, Vzdálenost (km), Čas za volantem, Odhadovaná spotřeba (l/100km).
     Vezmi v úvahu, že Hyundai i30 1.5 T-GDi MHEV má reálnou kombinovanou spotřebu kolem 5.8-6.5 l/100km při tomto zatížení, ale v horách nebo městě to bude více.
     
-    Použij české názvy míst a buď konkrétní. Uveď i přibližné časy přesunů autem.
-    Odpověď formátuj v přehledném Markdownu s nadpisy pro jednotlivé dny. Tabulka musí být ve standardním Markdown formátu.`;
+    Použij české názvy míst a buď konkrétní. Odpověď formátuj v přehledném Markdownu.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }, { googleMaps: {} }],
@@ -45,12 +50,18 @@ export const generateTripPlan = async (
       },
     });
 
+    if (!response.text) {
+      throw new Error("Model vrátil prázdnou odpověď. Zkontrolujte nastavení bezpečnosti nebo kvóty.");
+    }
+
     return {
-      content: response.text || "Omlouváme se, plán se nepodařilo vygenerovat.",
+      content: response.text,
       groundingLinks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Detailní chyba Gemini API:", error);
+    // Extrahuje srozumitelnou zprávu pro uživatele
+    const message = error.message || "Neznámá chyba při komunikaci s AI.";
+    throw new Error(message);
   }
 };

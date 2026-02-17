@@ -32,10 +32,11 @@ const App: React.FC = () => {
     try {
       const result = await generateTripPlan(data, userLocation);
       setPlan(result);
-      // Scroll to result
-      window.scrollTo({ top: document.getElementById('results')?.offsetTop, behavior: 'smooth' });
-    } catch (err) {
-      setError('Nepodařilo se vygenerovat plán. Zkuste to prosím znovu.');
+      setTimeout(() => {
+        document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } catch (err: any) {
+      setError(err.message || 'Nepodařilo se vygenerovat plán. Zkontrolujte připojení a API klíč.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -43,61 +44,60 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-slate-50">
       <Header />
       
       <main className="flex-grow">
-        {/* Hero Section */}
-        <div className="relative overflow-hidden bg-slate-900 py-24 sm:py-32">
+        <div className="relative overflow-hidden bg-slate-900 py-20 sm:py-28">
           <img
-            src="https://picsum.photos/1920/1080?nature"
-            alt="Travel background"
-            className="absolute inset-0 -z-10 h-full w-full object-cover opacity-40 blur-[2px]"
+            src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop"
+            alt="Roadtrip"
+            className="absolute inset-0 -z-10 h-full w-full object-cover opacity-50"
           />
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl lg:mx-0">
-              <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl mb-4">
-                Vaše dobrodružství <br /> začíná tady.
-              </h1>
-              <p className="text-lg leading-8 text-slate-300">
-                Chytrý plánovač roadtripů využívající umělou inteligenci pro ty nejlepší zážitky, 
-                od skrytých vyhlídek po nejlepší lokální restaurace.
-              </p>
-            </div>
+          <div className="mx-auto max-w-7xl px-6 lg:px-8 text-center sm:text-left">
+            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl mb-6">
+              Váš roadtrip, <br className="hidden sm:block" /> sestavený inteligencí.
+            </h1>
+            <p className="max-w-xl text-lg leading-8 text-slate-300">
+              Personalizované plány cest optimalizované pro váš Hyundai i30. 
+              Stačí říct kam a na jak dlouho.
+            </p>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-            {/* Form Column */}
-            <div className="lg:col-span-5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            <div className="lg:col-span-5 sticky top-24">
               <TripForm onSubmit={handlePlanSubmit} isLoading={isLoading} />
               
               {error && (
-                <div className="mt-4 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  {error}
+                <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl shadow-sm animate-in fade-in duration-300">
+                  <div className="flex gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-bold mb-1">Chyba při generování</p>
+                      <p className="text-sm opacity-90">{error}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Results Column */}
             <div id="results" className="lg:col-span-7">
               {plan ? (
                 <Itinerary plan={plan} />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-                  <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                <div className="h-full min-h-[400px] flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-white/50 backdrop-blur-sm">
+                  <div className="bg-indigo-50 p-6 rounded-full mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-slate-700 mb-2">Zatím žádný plán</h3>
-                  <p className="text-slate-500 max-w-md">
-                    Vyplňte formulář vlevo a nechte AI sestavit vaši ideální cestu. 
-                    Najdeme pro vás ubytování, památky i nejlepší jídlo.
+                  <h3 className="text-xl font-bold text-slate-700 mb-2">Připraveni na cestu?</h3>
+                  <p className="text-slate-500 max-w-sm">
+                    Vyplňte parametry vlevo. AI analyzuje trasu, spotřebu vašeho vozu a vyhledá nejlepší místa k návštěvě.
                   </p>
                 </div>
               )}
@@ -106,11 +106,10 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-12">
+      <footer className="bg-white border-t border-slate-200 py-10 mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-slate-500 text-sm">
-            © 2024 Roadtrip Master CZ. Vyrobeno s láskou pro cestovatele. <br />
-            Powered by Google Gemini API
+          <p className="text-slate-400 text-sm font-medium">
+            Roadtrip Master CZ • Hyundai i30 Edition
           </p>
         </div>
       </footer>
